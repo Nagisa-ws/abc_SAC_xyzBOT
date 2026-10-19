@@ -1,0 +1,29 @@
+{
+  "mission": 5,
+  "algorithm": "SAC",
+  "obs_dim": 63,
+  "source_model": "/mnt/c/Users/HP/Mujoco_WS/sac_curriculum_arm/checkpoints/mission5/best_model.zip",
+  "vecnormalize": "/mnt/c/Users/HP/Mujoco_WS/sac_curriculum_arm/checkpoints/mission5/best_vecnormalize.pkl",
+  "source": "best",
+  "timesteps": 675000,
+  "interrupted": true,
+  "heldout_test": {
+    "n": 200,
+    "seed0": 400000,
+    "success_rate": 0.54,
+    "ci95": [
+      0.4708216309361468,
+      0.6076706885903875
+    ],
+    "reasons": {
+      "success": 108,
+      "fruit_hit": 7,
+      "grasp_miss": 21,
+      "leaf_overbend": 36,
+      "twist_fail": 11,
+      "timeout": 6,
+      "grip_slip": 6,
+      "plant_hit": 5
+    }
+  }
+}

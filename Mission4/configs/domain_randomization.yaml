@@ -1,0 +1,163 @@
+# Mission4/configs/domain_randomization.yaml
+# Konfigurasi ENV Misi 4: mencapai pose cengkeram buah nanas menembus daun (simulasi).
+#
+# CATATAN UKURAN: semua rentang tanaman di bawah adalah TEBAKAN awal (ukuran nyata acak & belum diukur).
+# Ukur 15-20 tanaman di lapangan (tinggi & diameter buah, tinggi buah dari tanah, panjang daun, diameter
+# leher crown) lalu ganti rentang di blok `plant`. Tinggi dihitung dari BIDANG BASE ROBOT (z = 0). Bila base
+# robot di kendaraan lebih tinggi dari tanah, tanah tanaman ada di bawah base -> kurangi center_height_range.
+
+robot_dynamics:
+  payload_mass_range: [0.0, 0.3]      # tambahan massa gripper (kabel, kamera, jari custom)
+  gravity_scale_range: [0.98, 1.02]
+randomization: {init_joint_noise: 0.05, obs_noise_std: 0.005}
+workspace:                             # (tidak dipakai Misi 4; posisi tanaman diatur harvest.plant_placement)
+  finish_point_radius_range: [0.35, 0.48]
+  finish_point_height_range: [0.25, 0.45]
+  finish_point_azimuth_range: [-3.1416, 3.1416]
+physics: {n_substeps: 10, gravity_compensation: true}
+# max_orientation_dev_deg 180: orientasi gripper bebas (diatur controller referensi menuju orientasi cengkeram)
+# max_orient_lead_deg: orientasi target maks 8 deg di depan orientasi aktual (pergelangan ~0.05 rad/langkah)
+action: {max_pos_delta: 0.05, max_rot_delta: 0.08, max_joint_delta: 0.25, max_orientation_dev_deg: 180.0,
+         max_orient_lead_deg: 8.0}
+ik: {max_iters: 60, pos_tol: 0.0001, rot_tol: 0.002, rot_weight: 0.5}
+safety: {terminate_on_contact: true, gripper_collision_radius: 0.04}
+validation:
+  max_scenario_attempts: 40
+  ik_pos_tol: 0.002
+  ik_rot_tol: 0.03
+  waypoint_step: 0.04
+  approach_hard_margin: 0.03     # seluruh robot vs batang/buah/leher di rute home -> S
+  line_hard_margin: 0.01         # badan robot (selain jari) vs bagian keras di garis S -> titik cengkeram
+  finger_hard_margin: 0.004      # jari vs bagian keras (objek yang dicengkeram dilewati jari terbuka)
+  home_leaf_keepout: 0.05      # daun yang menembus/menempel badan robot di pose home dipangkas
+  plans_to_try: 4                # jumlah garis kandidat (urut clearance) yang dicoba sebelum skenario diganti
+episode:
+  max_steps: 300
+  success_pos_threshold: 0.015   # TCP ke titik cengkeram
+  success_orient_deg: 12.0       # error orientasi gripper ke orientasi cengkeram
+  t1_reach_threshold: 0.03       # S tercapai -> fase 1 (garis)
+
+reward:
+  time_penalty: -0.02
+  distance_penalty: 0.5
+  progress_weight: 20.0
+  smoothness_penalty: 0.05
+  contact_penalty: -10.0         # self-collision / lantai
+  phase_transition_bonus: 5.0
+  cross_track_penalty: 150.0
+  orientation_penalty: 0.5       # per rad (fase 1)
+  success_reward: 40.0
+  leaf_energy_penalty: 0.15      # per langkah, x min(energi tekuk daun / leaf_energy_ref, leaf_energy_cap)
+  leaf_energy_cap: 3.0
+  timeout_penalty: -20.0         # langkah terakhir episode tanpa sukses
+  plant_hit_penalty: -50.0
+  leaf_overforce_penalty: -50.0
+
+contact:
+  hard_force_limit: 3.0          # N; robot vs batang/buah/leher (selain jari pada objek) -> plant_hit
+  target_touch_limit: 25.0       # N; jari menekan objek cengkeram sebelum menutup -> fruit_hit
+  # Kerusakan daun diukur dari TEKUKAN (sudut engsel dari bentuk istirahat), bukan gaya kontak sesaat: gaya kontak
+  # pertama melonjak 0 -> 150-280 N dalam 1 langkah (impuls tumbukan) dan tidak bisa diantisipasi policy.
+  leaf_bend_limit_rad: 0.52      # ~30 deg pada satu engsel daun -> leaf_overbend (risiko robek/patah; TEBAKAN)
+  crown_leaves_count_as_damage: false   # daun crown (ikut dipanen) tidak memicu leaf_overbend; tetap dipenalti
+  leaf_energy_ref: 0.1           # J; skala penalti energi pegas daun yang ditekuk
+  leaf_force_ref: 20.0           # N; hanya untuk laporan
+
+# ─── Gripper DH-Robotics PGIA-140-80 (aproksimasi datasheet; verifikasi dgn unit asli) ───
+#   celah jari = [2*finger_offset, 2*(finger_offset + 0.04)].
+#   finger_offset 0.015 -> 30-110 mm: leher crown (30-60 mm) selalu muat; buah hanya bila diameter <= ~86 mm.
+#   Untuk mencengkeram BADAN buah besar (100-150 mm) pasang jari offset ~0.035 (70-150 mm) -> crown tidak muat.
+gripper:
+  finger_offset: 0.015
+  stroke_per_finger: 0.04
+  grip_clearance: 0.012
+  max_force: 140.0
+  grip_force_frac: 0.8
+
+harvest:
+  plant_placement:               # posisi pangkal batang relatif base robot (robot menghadap +y)
+    radius_range: [0.60, 0.85]
+    azimuth_deg_range: [60, 120]
+  start_reach: {r_min: 0.25, r_max: 1.05, z_min: 0.15, z_max: 1.10}
+  cross_track_cap: 0.08
+
+# ─── Observasi tambahan: sensor gaya/torsi pergelangan (UR10e e-series punya F/T bawaan di flange) ───
+# Slot rintangan ke-4 (obs_rel[9:12], obs_dist[3]) diganti gaya kontak pada gripper (dunia, / skala N) + besarnya.
+# Tanpa ini policy tidak bisa "merasakan" daun yang sedang didorong (hanya melihat 4 titik daun terdekat).
+observation:
+  wrist_force_in_last_obstacle_slot: true
+  wrist_force_scale: 20.0
+
+# ─── Persepsi (simulasi kesalahan kamera saat merencanakan garis) ───
+# Perencana stargaze memakai titik daun hasil "deteksi" dari pose look: sebagian daun TIDAK terdeteksi (tertutup
+# daun lain) dan posisinya berderau. Selama bergerak, observasi policy memakai posisi daun aktual di dekat robot
+# (kamera pergelangan melihat daun dari dekat). Terukur (60-100 skenario, level akhir): referensi saja 93% bila
+# perencana tahu semua daun persis, 77% dgn miss 30% + derau 2 cm -> di sinilah koreksi RL dibutuhkan.
+# TEBAKAN: ukur tingkat deteksi daun kamera Anda lalu sesuaikan. 0 / 0 = perencana tahu semua daun persis.
+perception:
+  leaf_miss_prob: 0.3
+  leaf_pos_noise: 0.02
+
+# ─── Perencana garis (konsep stargaze pengguna) ───
+planner:
+  cube_half_size: 0.30           # L kubus terluar (stargaze: 15/30/45 cm -> di sini 30 cm)
+  resolution: 21                 # grid kandidat per face (21 x 21)
+  faces: [top, front, left, right]    # belakang = berseberangan dgn depan (dibuang), bawah = terlarang
+  grip_modes: [crown, body]
+  crown_top_min_deg: 55          # crown dicengkeram dari atas (elevasi garis >= 55 deg) ...
+  crown_side_max_deg: 20         # ... atau dari samping hampir datar (elevasi -5..20 deg)
+  body_min_deg: -10              # badan buah dicengkeram dari samping
+  body_max_deg: 30
+
+# ─── Tanaman (TEBAKAN, ganti dgn hasil ukur lapangan) ───
+plant:
+  pool: {n_rosette: 14, n_block: 8, n_tuft: 4}     # = robot_model/build_harvest_model.py
+  fruit:
+    diameter_range: [0.08, 0.14]
+    height_range: [0.14, 0.24]
+    center_height_range: [0.30, 0.60]
+    mass_range: [0.8, 2.5]
+  stalk: {diameter_range: [0.025, 0.045]}
+  crown:
+    neck_diameter_range: [0.030, 0.055]
+    neck_length_range: [0.02, 0.04]
+    tuft_leaves: 4
+    tuft_length_range: [0.10, 0.22]
+    tuft_width_range: [0.014, 0.02]
+    tuft_elevation_deg_range: [45, 80]
+  leaf:
+    width_range: [0.02, 0.03]          # diameter kapsul daun
+    stiffness_range: [1.0, 8.0]        # N.m/rad per engsel (TIDAK diketahui untuk daun nyata -> rentang lebar)
+    damping_range: [0.05, 0.3]
+  rosette:
+    count_range: [8, 14]
+    segments: 4
+    root_radius_range: [0.03, 0.07]
+    root_height_range: [0.03, 0.12]
+    elevation_deg_range: [50, 80]
+    bend_deg_range: [6, 16]
+    length_range: [0.45, 0.90]
+  block:                               # daun yang melintang di sisi atas/depan/kiri/kanan buah
+    p_block: 0.4                       # peluang tiap sisi terhalang (diatur kurikulum)
+    max_per_side: 2
+    p_all_sides: 0.1                   # peluang keempat sisi terhalang sekaligus
+    segments: 3
+    distance_range: [0.03, 0.15]       # jarak dari permukaan buah / atas crown
+    length_range: [0.35, 0.60]
+  default_level: {}
+
+# ─── struktur policy ───
+policy_structure:
+  type: residual
+  residual_scale_pos: 0.5
+  residual_scale_rot: 0.5         # orientasi kini penting (jari harus sejajar objek) -> RL boleh mengoreksi
+  reference: {gain: 0.8, lookahead: 2, rot_gain: 0.8}
+  # progress_min: komponen gerak searah controller referensi >= 0.4 x |a_ref| (RL membelok/mengatur kecepatan,
+  #               tetapi tidak bisa berhenti di depan daun). target_gate [d0, d1]: koreksi RL memudar ke 0 saat TCP
+  #               < d1 dari titik cengkeram (nol penuh < d0). Alasan & angka: README, bagian Misi 4-5.
+  progress_min: 0.4
+  target_gate: [0.04, 0.10]     # koreksi memudar 10 -> 4 cm sebelum titik cengkeram
+  # tanpa residual_obstacle_gate: garis TIDAK dijamin bebas daun, justru di dekat daun koreksi RL dibutuhkan
+
+safety_filter:
+  enabled: false

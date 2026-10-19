@@ -1,0 +1,90 @@
+# Mission1/configs/sac_config.yaml  (v3)
+# Konfigurasi TRAINING Misi 1 (SAC, normalisasi, transfer, ekspor, debug).
+# Jalankan: python train_mission1.py   (tanpa argumen CLI)
+#
+# v3: struktur policy RESIDUAL (lihat Mission1/configs/domain_randomization.yaml -> policy_structure).
+# Ambang terakhir kurikulum (adaptive.thresholds[-1]) = ambang yang dipakai SEMUA evaluasi
+# (shared/evaluation/task_spec.py), jadi angka training dan evaluasi mengukur tugas yang sama.
+
+runtime:
+  torch_num_threads: 1
+  device: cpu                    # MLP kecil: CPU umumnya lebih cepat dari GPU
+  progress_print_interval_sec: 15
+
+run:
+  timesteps: 1_000_000            # terverifikasi: 120k -> uji held-out 95,5 % @ 5 mm; lebih lama = lebih presisi
+  n_envs: 4
+  vec_env: auto                  # auto | subproc | dummy
+  seed: 4
+  logdir: checkpoints/mission1/tb_logs
+  ckpt_dir: checkpoints/mission1
+  ckpt_freq: 500_000             # checkpoint periodik (model + VecNormalize; replay buffer TIDAK disimpan)
+  # Pemilihan best_model: lebih jarang + lebih banyak skenario = bias seleksi lebih kecil.
+  # (eval tiap 5k x 30 skenario = 400 evaluasi pada skenario yang sama -> "best" optimistis ~10 poin)
+  eval_freq: 25_000
+  eval_episodes: 50
+  log_interval_episodes: 10      # SAC menulis log TensorBoard tiap N episode
+  # Akhir training: best vs final dibandingkan pada skenario VALIDASI, yang terpilih diuji pada skenario
+  # UJI baru (keduanya tidak pernah dipakai memilih checkpoint). Hasil -> checkpoints/missionN/final_test.json
+  final_validation_episodes: 100
+  final_test_episodes: 200
+
+sac:
+  buffer_size: 250_000           # PER ENV: 4 env x 250k = 1 juta transisi (~0,5 GB RAM)
+  learning_starts: 5_000         # residual: data awal dikumpulkan dgn policy (koreksi ~0 = referensi), bukan acak
+  batch_size: 256
+  tau: 0.005                     # kecepatan update target critic
+  gamma: 0.995
+  train_freq: 1                  # kumpulkan 1 langkah (di semua env) lalu update
+  gradient_steps: 1              # update-to-data 0.25 (4 env): stabil (tanpa overestimation) dan ~3x lebih cepat
+  learning_rate: 0.0003
+  lr_schedule: constant          # constant | linear
+  ent_coef: auto_0.01            # koefisien entropi otomatis, nilai awal kecil (koreksi residual harus halus)
+  target_entropy: -8             # lebih rendah dari default (-6): koreksi lebih deterministik demi presisi 5 mm
+  ent_coef_max: 0.05             # batas atas alpha otomatis (pengaman runaway)
+  actor_mean_reg: 1.0e-3         # regularisasi kecil mean pra-tanh (pengaman aksi jenuh)
+  residual_log_std_init: -1.6    # std awal koreksi (pra-tanh) 0.2 -> derau eksplorasi ~0.1 aksi (~5 mm/langkah)
+  # Residual tanpa transfer: critic dilatih dulu (actor beku, koreksi ~0), lalu actor ditarik ke koreksi NOL
+  # dgn bobot meluruh ke floor. Tanpa keduanya actor mengikuti critic acak dan merusak perilaku awal.
+  residual_critic_warmup_steps: 20_000
+  residual_anchor_coef: 0.4
+  residual_anchor_steps: 100_000
+  residual_anchor_floor: 0.1
+  net_arch: [256, 256]           # actor; sama di SEMUA misi (syarat transfer bobot)
+  qf_net_arch: [256, 256]        # critic Q; sama di SEMUA misi
+  activation_fn: relu            # relu | tanh | elu
+
+normalization:
+  clip_obs: 10.0
+  epsilon: 1.0e-8
+  norm_reward: false
+
+transfer:
+  enabled: false
+
+export:
+  onnx_dir: models               # folder bersama semua misi
+  name_prefix: onnx_mission1     # -> models/onnx_mission1_v1.onnx, _v2, ...
+  source: auto                   # auto (pilih best/final lewat set validasi) | best | final
+  verify_tolerance: 1.0e-4
+
+debug:
+  enabled: true
+  output_dir: checkpoints/mission1/debug
+  run_sanity_check_before_training: true
+  sanity_n_ik_targets: 20
+  sanity_n_resets: 10
+  sanity_n_scripted_episodes: 10
+  replay_episodes: 3
+  robustness_episodes: 20
+
+# ─── Adaptive Threshold (Misi 1) ───
+# Level terakhir = tugas akhir yang dievaluasi (5 mm, sama dgn spesifikasi proyek asal).
+adaptive:
+  enabled: true
+  thresholds: [0.10, 0.05, 0.02, 0.01, 0.005]   # 10 cm -> 5 cm -> 2 cm -> 1 cm -> 5 mm
+  success_rate_to_advance: 0.85           # naik level bila success rate >= 85%
+  check_every_n_episodes: 50
+  window_episodes: 100
+  warmup_episodes: 100                    # minimum episode per level sebelum dievaluasi
+  reward_success_multiplier: 1.20          # success reward = R_base * 1.2^level (hanya ini yang naik)

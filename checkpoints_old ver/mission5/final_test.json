@@ -1,0 +1,63 @@
+{
+  "source": "best",
+  "validation": {
+    "best": {
+      "n": 100,
+      "seed0": 300000,
+      "success_rate": 0.59,
+      "ci95": [
+        0.4920125056109662,
+        0.6813284290433533
+      ],
+      "reasons": {
+        "plant_hit": 2,
+        "success": 59,
+        "leaf_overbend": 14,
+        "fruit_hit": 4,
+        "grasp_miss": 7,
+        "twist_fail": 6,
+        "timeout": 5,
+        "grip_slip": 3
+      }
+    },
+    "final": {
+      "n": 100,
+      "seed0": 300000,
+      "success_rate": 0.58,
+      "ci95": [
+        0.4820630799889527,
+        0.672017750814887
+      ],
+      "reasons": {
+        "plant_hit": 3,
+        "grasp_miss": 14,
+        "twist_fail": 7,
+        "success": 58,
+        "leaf_overbend": 10,
+        "timeout": 4,
+        "fruit_hit": 3,
+        "grip_slip": 1
+      }
+    }
+  },
+  "test": {
+    "n": 200,
+    "seed0": 400000,
+    "success_rate": 0.595,
+    "ci95": [
+      0.5257958199999483,
+      0.6606234388755706
+    ],
+    "reasons": {
+      "success": 119,
+      "fruit_hit": 8,
+      "leaf_overbend": 35,
+      "timeout": 9,
+      "twist_fail": 10,
+      "grasp_miss": 8,
+      "grip_slip": 5,
+      "plant_hit": 6
+    }
+  },
+  "timesteps": 300000
+}

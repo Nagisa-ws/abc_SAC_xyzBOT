@@ -1,0 +1,16 @@
+{
+  "success_rate": 0.7666666666666667,
+  "mean_return": 0.8598260740720434,
+  "mean_steps": 161.06666666666666,
+  "mean_final_dist": 0.16476625458157473,
+  "reasons": {
+    "success": 23,
+    "timeout": 3,
+    "collision": 3,
+    "self_collision": 1
+  },
+  "cross_track_mean": 0.03068748591257906,
+  "min_clearance": -0.004043183232326837,
+  "level": 3,
+  "timesteps": 45000
+}

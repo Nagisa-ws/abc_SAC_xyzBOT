@@ -1,0 +1,73 @@
+# Mission1/configs/domain_randomization.yaml
+# Konfigurasi ENV Misi 1 (workspace, aksi, IK, reward, domain randomization).
+
+robot_dynamics:                       # domain randomization dinamika
+  payload_mass_range: [0.0, 1.0]      # massa ekstra di gripper (kg)
+  gravity_scale_range: [0.98, 1.02]   # residual gravitasi (dikompensasi nominal, lihat physics)
+
+randomization:
+  init_joint_noise: 0.05              # noise pose awal (rad), hanya saat training
+  obs_noise_std: 0.005                # derau sensor pada observasi kontinu (hanya training)
+
+workspace:                            # area target (relatif base)
+  finish_point_radius_range: [0.35, 0.48]
+  finish_point_height_range: [0.25, 0.45]
+  finish_point_azimuth_range: [-3.1416, 3.1416]
+  base_height_offset: 0.181
+
+physics:
+  n_substeps: 10                      # mj_step per step RL (dt sim = 0.002 s)
+  gravity_compensation: true          # gravcomp nominal -> posisi tertahan saat aksi = 0
+
+action:
+  max_pos_delta: 0.05                 # m per step pada aksi = 1
+  max_rot_delta: 0.08                 # rad per step pada aksi = 1
+  max_joint_delta: 0.25               # batas perubahan target sendi per step (rad)
+  max_orientation_dev_deg: 30.0       # kerucut orientasi EE terhadap pose home
+
+ik:
+  max_iters: 60
+  pos_tol: 1.0e-4
+  rot_tol: 2.0e-3
+  rot_weight: 0.5
+
+safety:
+  terminate_on_contact: true          # self-collision / lantai -> episode berhenti
+  gripper_collision_radius: 0.04
+
+validation:                           # validasi skenario saat reset
+  max_scenario_attempts: 40
+  ik_pos_tol: 2.0e-3
+  waypoint_step: 0.04
+
+episode:
+  max_steps: 200
+  success_pos_threshold: 0.10         # nilai AWAL; dinaikkan-ketat oleh adaptive threshold
+
+reward:
+  time_penalty: -0.02
+  distance_penalty: 0.5               # R_dist = -w_d * ||P_target - P_ee||
+  progress_weight: 20.0               # shaping simetris: w * (d_prev - d_now)
+  smoothness_penalty: 0.05            # R_smooth = -w_s * ||a_t - a_{t-1}||^2
+  contact_penalty: -10.0
+  success_reward: 10.0                # R_base; dikali multiplier(r_thresh) oleh curriculum
+
+# ─── v3: struktur policy (shared/control/reference.py) ───
+#   residual : aksi = clip(a_ref + skala * a_RL); a_ref = controller referensi yang mengikuti jalur tervalidasi
+#              (pendekatan lurus/polar ke T1, lalu garis T1->T2). RL belajar koreksi. a_ref masuk observasi.
+#   direct   : RL mengeluarkan aksi penuh (struktur lama).
+policy_structure:
+  type: residual
+  residual_scale_pos: 0.5      # koreksi posisi maks 0.5 x 5 cm per langkah
+  residual_scale_rot: 1.0      # rotasi sepenuhnya dari RL (referensi tidak memutar)
+  reference: {gain: 0.8, lookahead: 2}
+
+# ─── v3: safety filter opsional (shared/safety/shield.py) ───
+#   Memeriksa tiap aksi satu langkah ke depan dgn model robot; aksi yang akan menabrak diganti kandidat aman
+#   terdekat. Terukur pada policy direct lama (Misi 3, margin eval): kegagalan kontak 38 -> 1 per 200 skenario, tetapi jadi timeout
+#   (success tetap) karena rute policy itu sendiri yang tidak layak. Berguna sbg pengaman robot nyata.
+safety_filter:
+  enabled: false
+  contact_margin: 0.01
+  obstacle_margin: 0.015
+  penalty: 0.0

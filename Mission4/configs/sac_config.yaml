@@ -1,0 +1,110 @@
+# Mission4/configs/sac_config.yaml
+# Konfigurasi TRAINING Misi 4 (mencapai pose cengkeram nanas menembus daun).
+# Jalankan: python Mission4/train_mission4.py   (tanpa argumen CLI)
+#
+# Bobot awal = Misi 3 (checkpoints/mission3/best_model.zip). Layout observasi sama (63 nilai), tetapi tugas
+# & distribusi observasi berubah total (tanaman + daun lentur, rotasi gripper), jadi:
+#   * koreksi residual direset ke ~0 (perilaku awal = controller referensi),
+#   * statistik normalisasi SEMUA dimensi diisi ulang dari rollout Misi 4 lalu dibekukan,
+#   * dimensi yang konstan di Misi 3 (ref_action rotasi) diperlakukan sbg dimensi baru (bobot input = 0).
+# Level TERAKHIR kurikulum = tugas yang dipakai semua evaluasi (shared/evaluation/task_spec.py).
+
+runtime:
+  torch_num_threads: 1
+  device: cpu
+  progress_print_interval_sec: 30
+
+run:
+  timesteps: 1_000_000
+  n_envs: 4
+  vec_env: auto
+  seed: 7
+  logdir: checkpoints/mission4/tb_logs
+  ckpt_dir: checkpoints/mission4
+  ckpt_freq: 500_000
+  eval_freq: 25_000
+  eval_episodes: 50
+  eval_seed: 424242
+  log_interval_episodes: 10
+  final_validation_episodes: 100
+  final_test_episodes: 200
+
+sac:
+  buffer_size: 250_000
+  learning_starts: 5_000
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.995
+  train_freq: 1
+  gradient_steps: 1
+  learning_rate: 1.5e-4
+  lr_schedule: constant
+  ent_coef: 0.005               # alpha tetap (stabil di Misi 3)
+  target_entropy: auto
+  ent_coef_max: 0.02
+  actor_mean_reg: 1.0e-3
+  net_arch: [256, 256]
+  qf_net_arch: [256, 256]
+  activation_fn: relu
+
+normalization:
+  clip_obs: 10.0
+  epsilon: 1.0e-8
+  norm_reward: false
+
+transfer:
+  enabled: true
+  source_mission: 3
+  source_model: checkpoints/mission3/best_model.zip
+  source_vecnormalize: checkpoints/mission3/best_vecnormalize.pkl
+  zero_new_input_weights: true
+  reinit_constant_dims: true     # ref_action rotasi selalu 0 di Misi 3
+  reinit_fields: {obs_rel: [9, 10, 11], obs_dist: [3]}   # slot rintangan ke-4 = gaya pergelangan di Misi 4-5
+  refit_all_stats: true          # tanaman/daun = distribusi observasi baru
+  freeze_obs_rms: true
+  warm_stats_steps: 8000
+  obs_rms_count: 50000.0
+  critic_warmup_steps: 25000     # actor & alpha beku, critic belajar menilai controller referensi dulu
+  log_std_init: null
+  copy_ent_coef: false
+  reset_residual_output: true
+  residual_log_std_init: -1.6
+  actor_anchor_target: zero
+  actor_anchor_coef: 0.4
+  actor_anchor_steps: 150000
+  actor_anchor_floor: 0.15
+
+# ─── Kurikulum tanaman ───
+#   p_block      : peluang tiap sisi (atas/depan/kiri/kanan) dihalangi daun
+#   max_per_side : maks daun penghalang per sisi
+#   p_all_sides  : peluang keempat sisi terhalang sekaligus
+#   rosette_*    : jumlah daun roset
+#   stiffness_max: kekakuan maks engsel daun (N.m/rad)
+# Level TERAKHIR = tugas evaluasi.
+curriculum:
+  enabled: true
+  advance_success_rate: 0.80
+  check_every_n_episodes: 50
+  window_episodes: 100
+  warmup_episodes: 100
+  levels:
+    - {p_block: 0.0, max_per_side: 1, p_all_sides: 0.0, rosette_min: 6, rosette_max: 10, stiffness_max: 4.0}
+    - {p_block: 0.3, max_per_side: 1, p_all_sides: 0.05, rosette_min: 8, rosette_max: 12, stiffness_max: 6.0}
+    - {p_block: 0.5, max_per_side: 2, p_all_sides: 0.15, rosette_min: 10, rosette_max: 14, stiffness_max: 8.0}
+    - {p_block: 0.6, max_per_side: 2, p_all_sides: 0.25, rosette_min: 10, rosette_max: 14, stiffness_max: 10.0}
+
+export:
+  onnx_dir: models
+  name_prefix: onnx_mission4
+  source: auto
+  verify_tolerance: 1.0e-4
+
+debug:
+  enabled: true
+  output_dir: checkpoints/mission4/debug
+  run_sanity_check_before_training: true
+  sanity_n_ik_targets: 10
+  sanity_n_resets: 5
+  sanity_n_scripted_episodes: 5
+  replay_episodes: 3
+  robustness_episodes: 20

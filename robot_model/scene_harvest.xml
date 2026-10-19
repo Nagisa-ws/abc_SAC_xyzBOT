@@ -1,0 +1,628 @@
+<mujoco model="ur10e harvest scene (Misi 4-5)">
+  <!-- DIBANGKITKAN oleh robot_model/build_harvest_model.py - jangan diedit manual. -->
+  <include file="ur10e_harvest.xml"/>
+
+  <!-- midphase (BVH per body) DIMATIKAN: env mengubah posisi/ukuran geom tanaman tiap episode, sedangkan BVH
+       dihitung sekali saat kompilasi -> pasangan kontak jari-leher crown / robot-batang bisa terlewat
+       (terukur: jari menutup penuh menembus leher crown tanpa kontak). Broadphase memakai rbound/aabb yang
+       diperbarui env. -->
+  <option timestep="0.002" integrator="implicitfast">
+    <flag midphase="disable"/>
+  </option>
+  <size memory="40M"/>
+
+  <default>
+    <default class="leaf">
+      <geom type="capsule" contype="2" conaffinity="0" condim="3" friction="0.4 0.01 0.001"
+            solref="0.01 1" solimp="0.9 0.95 0.002 0.5 2" group="2"/>
+    </default>
+    <default class="leafjoint">
+      <joint stiffness="3" damping="0.08" armature="0.0005" limited="false"/>
+    </default>
+    <default class="hardplant">
+      <geom contype="4" conaffinity="0" condim="3" friction="0.8 0.02 0.001" group="2"/>
+    </default>
+  </default>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="640" offheight="480"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.35 0.28 0.2" rgb2="0.3 0.24 0.17"
+      markrgb="0.5 0.4 0.3" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.05"/>
+    <material name="fruit" rgba="0.85 0.6 0.15 1"/>
+    <material name="stalk" rgba="0.4 0.5 0.25 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 2.0" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" contype="1" conaffinity="1"/>
+
+    <!-- TANAMAN (posisi/ukuran diatur env tiap episode). Origin body = pangkal batang di tanah. -->
+    <body name="plant" pos="0 0.7 0">
+      <geom name="stalk" class="hardplant" type="capsule" size="0.02 0.15" pos="0 0 0.15" material="stalk"/>
+      <geom name="fruit_att" class="hardplant" type="capsule" size="0.06 0.05" pos="0 0 0.4" material="fruit"/>
+      <geom name="neck" class="hardplant" type="capsule" size="0.022 0.015" pos="0 0 0.52" rgba="0.4 0.55 0.2 1"/>
+      <site name="fruit_center" pos="0 0 0.4" size="0.01" rgba="1 1 0 0.5"/>
+      <site name="grasp_target" pos="0 0 0.52" size="0.008" rgba="0 1 1 0.8"/>
+      <body name="tuft_root" pos="0 0 0.55">
+        <body name="tuft0_s0" pos="0 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="tuft0_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="tuft0_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="tuft0_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          <body name="tuft0_s1" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="tuft0_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="tuft0_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="tuft0_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          </body>
+        </body>
+        <body name="tuft1_s0" pos="0 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="tuft1_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="tuft1_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="tuft1_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          <body name="tuft1_s1" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="tuft1_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="tuft1_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="tuft1_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          </body>
+        </body>
+        <body name="tuft2_s0" pos="0 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="tuft2_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="tuft2_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="tuft2_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          <body name="tuft2_s1" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="tuft2_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="tuft2_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="tuft2_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          </body>
+        </body>
+        <body name="tuft3_s0" pos="0 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="tuft3_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="tuft3_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="tuft3_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          <body name="tuft3_s1" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="tuft3_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="tuft3_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="tuft3_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.3 0.6 0.25 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="ros0_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros0_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros0_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros0_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros0_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros0_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros0_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros0_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros0_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros0_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros0_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros0_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros0_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros0_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros0_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros0_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros1_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros1_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros1_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros1_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros1_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros1_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros1_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros1_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros1_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros1_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros1_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros1_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros1_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros1_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros1_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros1_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros2_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros2_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros2_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros2_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros2_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros2_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros2_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros2_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros2_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros2_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros2_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros2_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros2_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros2_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros2_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros2_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros3_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros3_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros3_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros3_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros3_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros3_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros3_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros3_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros3_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros3_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros3_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros3_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros3_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros3_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros3_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros3_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros4_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros4_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros4_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros4_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros4_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros4_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros4_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros4_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros4_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros4_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros4_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros4_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros4_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros4_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros4_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros4_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros5_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros5_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros5_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros5_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros5_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros5_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros5_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros5_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros5_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros5_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros5_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros5_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros5_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros5_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros5_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros5_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros6_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros6_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros6_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros6_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros6_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros6_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros6_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros6_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros6_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros6_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros6_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros6_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros6_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros6_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros6_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros6_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros7_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros7_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros7_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros7_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros7_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros7_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros7_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros7_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros7_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros7_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros7_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros7_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros7_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros7_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros7_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros7_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros8_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros8_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros8_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros8_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros8_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros8_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros8_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros8_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros8_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros8_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros8_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros8_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros8_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros8_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros8_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros8_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros9_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros9_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros9_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros9_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros9_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros9_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros9_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros9_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros9_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros9_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros9_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros9_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros9_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros9_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros9_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros9_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros10_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros10_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros10_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros10_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros10_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros10_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros10_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros10_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros10_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros10_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros10_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros10_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros10_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros10_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros10_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros10_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros11_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros11_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros11_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros11_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros11_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros11_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros11_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros11_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros11_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros11_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros11_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros11_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros11_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros11_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros11_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros11_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros12_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros12_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros12_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros12_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros12_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros12_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros12_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros12_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros12_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros12_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros12_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros12_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros12_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros12_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros12_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros12_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="ros13_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="ros13_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="ros13_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="ros13_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+        <body name="ros13_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="ros13_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="ros13_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="ros13_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+          <body name="ros13_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="ros13_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="ros13_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="ros13_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            <body name="ros13_s3" pos="0.15 0 0" gravcomp="1">
+              <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+              <joint name="ros13_j3a" type="hinge" axis="0 1 0" class="leafjoint"/>
+              <joint name="ros13_j3b" type="hinge" axis="0 0 1" class="leafjoint"/>
+              <geom name="ros13_g3" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.25 0.55 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="blk0_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk0_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk0_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk0_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk0_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk0_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk0_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk0_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk0_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk0_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk0_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk0_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk1_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk1_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk1_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk1_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk1_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk1_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk1_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk1_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk1_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk1_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk1_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk1_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk2_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk2_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk2_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk2_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk2_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk2_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk2_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk2_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk2_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk2_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk2_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk2_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk3_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk3_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk3_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk3_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk3_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk3_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk3_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk3_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk3_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk3_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk3_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk3_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk4_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk4_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk4_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk4_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk4_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk4_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk4_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk4_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk4_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk4_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk4_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk4_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk5_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk5_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk5_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk5_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk5_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk5_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk5_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk5_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk5_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk5_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk5_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk5_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk6_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk6_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk6_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk6_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk6_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk6_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk6_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk6_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk6_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk6_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk6_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk6_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+      <body name="blk7_s0" pos="0 0 0" gravcomp="1">
+        <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+        <joint name="blk7_j0a" type="hinge" axis="0 1 0" class="leafjoint"/>
+        <joint name="blk7_j0b" type="hinge" axis="0 0 1" class="leafjoint"/>
+        <geom name="blk7_g0" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+        <body name="blk7_s1" pos="0.15 0 0" gravcomp="1">
+          <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+          <joint name="blk7_j1a" type="hinge" axis="0 1 0" class="leafjoint"/>
+          <joint name="blk7_j1b" type="hinge" axis="0 0 1" class="leafjoint"/>
+          <geom name="blk7_g1" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          <body name="blk7_s2" pos="0.15 0 0" gravcomp="1">
+            <inertial mass="0.02" pos="0.075 0 0" diaginertia="0.00002 0.00004 0.00004"/>
+            <joint name="blk7_j2a" type="hinge" axis="0 1 0" class="leafjoint"/>
+            <joint name="blk7_j2b" type="hinge" axis="0 0 1" class="leafjoint"/>
+            <geom name="blk7_g2" class="leaf" size="0.012 0.075" pos="0.075 0 0" quat="0.70710678 0 0.70710678 0" rgba="0.35 0.6 0.15 1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- BUAH SETELAH LEPAS (freejoint). Diparkir jauh; env memindahkannya ke pose buah saat batang patah. -->
+    <body name="fruit_free" pos="0 0 -3">
+      <freejoint name="fruit_free_joint"/>
+      <inertial mass="1.5" pos="0 0 0" diaginertia="0.006 0.006 0.003"/>
+      <geom name="fruit_free_body" type="capsule" size="0.06 0.05" contype="0" conaffinity="0"
+            material="fruit" friction="0.8 0.02 0.001"/>
+      <geom name="fruit_free_neck" type="capsule" size="0.022 0.015" pos="0 0 0.12" contype="0" conaffinity="0"
+            rgba="0.4 0.55 0.2 1"/>
+      <geom name="fruit_free_tuft" type="capsule" size="0.04 0.07" pos="0 0 0.22" contype="0" conaffinity="0"
+            rgba="0.3 0.6 0.25 1"/>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="fruit_free" body2="Servo-v1"/>
+    <exclude body1="fruit_free" body2="finger_left"/>
+    <exclude body1="fruit_free" body2="finger_right"/>
+    <exclude body1="fruit_free" body2="wrist_3_link"/>
+  </contact>
+
+  <equality>
+    <!-- kedua jari bergerak simetris -->
+    <joint name="finger_sync" joint1="finger_left_joint" joint2="finger_right_joint" polycoef="0 1 0 0 0"
+           solref="0.004 1"/>
+    <!-- buah dipegang gripper (diaktifkan env setelah cengkeraman valid) -->
+    <weld name="fruit_in_gripper" body1="Servo-v1" body2="fruit_free" active="false" solref="0.004 1"/>
+  </equality>
+
+  <actuator>
+    <general class="size4" name="shoulder_pan" joint="shoulder_pan_joint"/>
+    <general class="size4" name="shoulder_lift" joint="shoulder_lift_joint"/>
+    <general class="size3_limited" name="elbow" joint="elbow_joint"/>
+    <general class="size2" name="wrist_1" joint="wrist_1_joint"/>
+    <general class="size2" name="wrist_2" joint="wrist_2_joint"/>
+    <general class="size2" name="wrist_3" joint="wrist_3_joint"/>
+    <!-- ctrl = bukaan per jari (m), 0 = menutup penuh, 0.04 = membuka penuh; gaya dibatasi 140 N -->
+    <position name="gripper_actuator" joint="finger_left_joint" ctrlrange="0 0.04" kp="3000"
+              forcerange="-140 140"/>
+  </actuator>
+
+  <keyframe>
+    <key name="home" qpos="-1.5708 -1.5708 1.5708 -1.5708 -1.5708 0 0.04 0.04 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 1 0 0 0" ctrl="-1.5708 -1.5708 1.5708 -1.5708 -1.5708 0 0.04"/>
+  </keyframe>
+</mujoco>

@@ -1,0 +1,13 @@
+{
+  "success_rate": 0.48,
+  "mean_return": 1.6119913870858453,
+  "mean_steps": 133.9,
+  "mean_final_dist": 0.18169767758631386,
+  "reasons": {
+    "self_collision": 14,
+    "success": 24,
+    "timeout": 12
+  },
+  "level": 3,
+  "timesteps": 750000
+}

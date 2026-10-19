@@ -1,0 +1,53 @@
+{
+  "source": "best",
+  "validation": {
+    "best": {
+      "n": 100,
+      "seed0": 300000,
+      "success_rate": 0.87,
+      "ci95": [
+        0.7901947810519012,
+        0.9224290614158575
+      ],
+      "reasons": {
+        "plant_hit": 2,
+        "success": 87,
+        "leaf_overbend": 7,
+        "timeout": 4
+      }
+    },
+    "final": {
+      "n": 100,
+      "seed0": 300000,
+      "success_rate": 0.84,
+      "ci95": [
+        0.7557955544110557,
+        0.8990479765052628
+      ],
+      "reasons": {
+        "plant_hit": 1,
+        "success": 84,
+        "timeout": 5,
+        "leaf_overbend": 6,
+        "fruit_hit": 4
+      }
+    }
+  },
+  "test": {
+    "n": 200,
+    "seed0": 400000,
+    "success_rate": 0.825,
+    "ci95": [
+      0.7663545078991807,
+      0.8713955882539106
+    ],
+    "reasons": {
+      "success": 165,
+      "leaf_overbend": 18,
+      "timeout": 8,
+      "fruit_hit": 6,
+      "plant_hit": 3
+    }
+  },
+  "timesteps": 1000000
+}

@@ -1,0 +1,26 @@
+"""
+Mission4/eval_envs/stage4_harvest_eval_env.py
+---------------------------------------------
+Env EVALUASI Misi 4. Subclass env training -> observasi, IK, validasi, reward IDENTIK dengan training.
+Model sama (robot_model/scene_harvest.xml: geometri visual = collision). training=False -> tanpa derau sensor;
+domain randomization hanya bila diminta.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from Mission4.envs.stage4_harvest_env import Stage4HarvestEnv
+
+_ROOT = Path(__file__).resolve().parents[2]
+EVAL_MODEL = str(_ROOT / "robot_model" / "scene_harvest.xml")
+EVAL_CONFIG = str(_ROOT / "Mission4" / "configs" / "domain_randomization.yaml")
+
+
+class Stage4HarvestEvalEnv(Stage4HarvestEnv):
+    def __init__(self, model_path: str = EVAL_MODEL, config_path: str = EVAL_CONFIG,
+                 seed: int | None = None, randomize: bool = False, obs_noise_std: float = 0.0,
+                 success_pos_threshold: float | None = None):
+        super().__init__(model_path=model_path, config_path=config_path,
+                         obs_noise_std=obs_noise_std, training=False, seed=seed, randomize=randomize)
+        if success_pos_threshold is not None:
+            self.set_success_threshold(float(success_pos_threshold))

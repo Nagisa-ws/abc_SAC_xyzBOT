@@ -1,0 +1,342 @@
+diff -ruN a/Mission2/configs/sac_config.yaml b/Mission2/configs/sac_config.yaml
+--- a/Mission2/configs/sac_config.yaml	2026-10-11 02:48:24.015263226 +0700
++++ b/Mission2/configs/sac_config.yaml	2026-10-11 02:48:24.016901411 +0700
+@@ -35,6 +35,7 @@
+   lr_schedule: constant          # constant | linear
+   ent_coef: auto_0.01            # alpha awal kecil: derau aksi harus menyusut demi ketelitian (padanan ent_coef 0.0 di PPO)
+   target_entropy: -8             # lebih rendah dari default (-6): mendorong aksi lebih deterministik
++  ent_coef_max: 0.02             # batas atas alpha otomatis (pengaman runaway; alpha sehat di training Anda ~0.008)
+   net_arch: [256, 256]           # actor; sama di SEMUA misi (syarat transfer bobot)
+   qf_net_arch: [256, 256]        # critic Q; sama di SEMUA misi
+   activation_fn: relu            # relu | tanh | elu
+@@ -54,7 +55,7 @@
+   freeze_obs_rms: true           # statistik normalisasi TIDAK diperbarui (jika diperbarui, input actor bergeser)
+   warm_stats_steps: 8000         # statistik dimensi baru diisi dari rollout nyata misi ini
+   obs_rms_count: 50000.0
+-  critic_warmup_steps: 50000     # actor dibekukan, hanya critic Q yang dilatih (critic belum mengenal fitur/reward baru)
++  critic_warmup_steps: 50000     # actor DAN alpha dibekukan, hanya critic Q yang dilatih (critic belum mengenal fitur/reward baru)
+   log_std_init: null             # JANGAN reset std aksi; pertahankan dari misi sebelumnya
+   copy_ent_coef: false           # alpha dimulai dari sac.ent_coef, bukan dari Misi 1
+ 
+diff -ruN a/Mission3/configs/sac_config.yaml b/Mission3/configs/sac_config.yaml
+--- a/Mission3/configs/sac_config.yaml	2026-10-11 02:48:24.023377524 +0700
++++ b/Mission3/configs/sac_config.yaml	2026-10-11 02:48:24.025179553 +0700
+@@ -30,11 +30,19 @@
+   tau: 0.005
+   gamma: 0.995
+   train_freq: 1
+-  gradient_steps: -1             # -1 = sebanyak langkah env yang dikumpulkan (update-to-data = 1)
++  # PERBAIKAN: 1 update per langkah vektor (4 env) = update-to-data 0.25. Dengan -1 (UTD 1) critic
++  # overestimate (Q(s,pi) 26 -> 71 sementara success 90% -> 10%) dan actor mengejarnya. Juga ~3x lebih cepat.
++  gradient_steps: 1
+   learning_rate: 1.5e-4
+   lr_schedule: constant          # constant | linear
+-  ent_coef: auto_0.03            # eksplorasi dipertahankan: penghindaran adalah perilaku BARU (padanan ent_coef 0.003 di PPO)
+-  target_entropy: auto           # auto = -dim(aksi) = -6
++  # PERBAIKAN (success Misi 3 runtuh ke 0%): alpha TETAP, bukan otomatis. Entropi policy hasil Misi 2
++  # (log_pi ~10.5 dgn std 0.25) di bawah target -6, sehingga alpha otomatis naik tanpa batas
++  # (0.033 -> 6.8 saat warm-up, ~0.9 setelahnya) dan reward kalah oleh bonus entropi. 0.005 ~ nilai sehat
++  # yang dicapai alpha otomatis di Misi 1-2 (0.006-0.008). Bila ingin otomatis lagi: auto_0.005 + ent_coef_max.
++  ent_coef: 0.005
++  target_entropy: auto           # hanya dipakai bila ent_coef = auto_*
++  ent_coef_max: 0.02             # batas atas alpha otomatis (diabaikan bila ent_coef tetap)
++  actor_mean_reg: 1.0e-3         # regularisasi kecil mean pra-tanh (pengaman terhadap aksi jenuh; bukan penyebab masalah)
+   net_arch: [256, 256]           # actor; sama di SEMUA misi (syarat transfer bobot)
+   qf_net_arch: [256, 256]        # critic Q; sama di SEMUA misi
+   activation_fn: relu            # relu | tanh | elu
+@@ -54,9 +62,16 @@
+   freeze_obs_rms: true           # statistik normalisasi TIDAK diperbarui (jika diperbarui, input actor bergeser)
+   warm_stats_steps: 8000         # statistik dimensi baru diisi dari rollout nyata misi ini
+   obs_rms_count: 50000.0
+-  critic_warmup_steps: 50000     # actor dibekukan, hanya critic Q yang dilatih (critic belum mengenal rintangan/reward baru)
++  critic_warmup_steps: 50000     # actor DAN alpha dibekukan, hanya critic Q yang dilatih (critic belum mengenal rintangan/reward baru)
+   log_std_init: -1.4             # head log_std diganti konstan: std aksi (pra-tanh) 0.25 seragam -> ruang eksplorasi untuk menghindar
+   copy_ent_coef: false           # alpha dimulai dari sac.ent_coef, bukan dari Misi 2
++  # jangkar actor setelah warm-up: actor ditarik ke aksi policy Misi 2, kekuatan meluruh linear dari
++  # coef ke floor. 0.4 = kekuatan bawaan TD3+BC. Floor > 0: jangkar yang habis total membuat actor mengejar
++  # galat critic (terukur: eval 90% -> 10% tepat saat jangkar = 0). Dengan floor 0.1 policy mulai menyimpang
++  # saat bobot < ~0.15; selama bobot >= 0.2 training stabil.
++  actor_anchor_coef: 0.4
++  actor_anchor_steps: 150000
++  actor_anchor_floor: 0.2
+ 
+ # ─── Kurikulum kesulitan (Misi 3) ───
+ #   obstacle_margin : koridor aman di sekitar garis T1->T2 (rintangan lebih dekat dari ini dipangkas).
+diff -ruN a/shared/training/callbacks.py b/shared/training/callbacks.py
+--- a/shared/training/callbacks.py	2026-10-11 02:48:24.005168937 +0700
++++ b/shared/training/callbacks.py	2026-10-11 02:48:24.007199796 +0700
+@@ -22,7 +22,6 @@
+ from pathlib import Path
+ 
+ import numpy as np
+-import torch
+ from stable_baselines3.common.callbacks import BaseCallback
+ from stable_baselines3.common.vec_env import sync_envs_normalization
+ 
+@@ -305,11 +304,12 @@
+     sebelumnya sehingga data replay berasal dari policy yang bagus, dan kedua critic belajar menilainya dulu.
+ 
+     Rincian SAC:
+-      * actor dibekukan lewat `requires_grad_(False)` pada seluruh parameter actor (latent_pi, mu, log_std);
+-        langkah optimizer actor menjadi no-op (gradien None);
+-      * koefisien entropi otomatis tetap diperbarui oleh SB3 selama actor beku, padahal entropi policy tidak
+-        berubah -> nilainya akan melenceng. Karena itu `log_ent_coef` dan state optimizer-nya DIKEMBALIKAN ke
+-        nilai awal saat warm-up selesai.
++      * actor dibekukan lewat flag `model.actor_frozen` (ArmSAC.train melewati langkah optimizer actor);
++      * koefisien entropi JUGA dibekukan selama warm-up (ArmSAC.train tidak memperbaruinya), sehingga critic
++        belajar dengan alpha yang sama dengan yang akan dipakai actor. Versi sebelumnya membiarkan alpha
++        diperbarui lalu me-reset-nya di akhir warm-up: alpha melonjak (Misi 3: 0.033 -> 6.8), critic dilatih
++        dengan target entropi raksasa, dan critic rusak itu menghancurkan actor setelah warm-up
++        (success 63% -> 0%). Reset di akhir tidak memperbaiki critic, jadi pendekatan itu dibuang.
+       * pengumpulan data memakai policy hasil transfer sejak langkah pertama (lihat ArmSAC).
+     """
+ 
+@@ -317,33 +317,20 @@
+         super().__init__()
+         self.steps = int(steps)
+         self._frozen = False
+-        self._ent0 = None
+-
+-    def _actor_params(self):
+-        return list(self.model.policy.actor.parameters())
+ 
+     def _set_frozen(self, frozen: bool):
+-        for prm in self._actor_params():
+-            prm.requires_grad_(not frozen)
+-        self._frozen = frozen
++        self.model.actor_frozen = bool(frozen)
++        self._frozen = bool(frozen)
+ 
+     def _on_training_start(self):
+         if self.steps > 0:
+-            log_ent = getattr(self.model, "log_ent_coef", None)
+-            self._ent0 = None if log_ent is None else log_ent.detach().clone()
+             self._set_frozen(True)
+-            print(f"[warmup] actor dibekukan; hanya critic yang dilatih sampai {self.steps:,} langkah", flush=True)
++            print(f"[warmup] actor & koefisien entropi dibekukan; hanya critic yang dilatih sampai "
++                  f"{self.steps:,} langkah", flush=True)
+ 
+     def _on_step(self) -> bool:
+         if self._frozen and self.num_timesteps >= self.steps:
+             self._set_frozen(False)
+-            log_ent = getattr(self.model, "log_ent_coef", None)
+-            if self._ent0 is not None and log_ent is not None:
+-                with torch.no_grad():
+-                    log_ent.copy_(self._ent0)
+-                opt = getattr(self.model, "ent_coef_optimizer", None)
+-                if opt is not None:
+-                    opt.state.clear()
+             print(f"[warmup] selesai @ {self.num_timesteps:,} langkah -> actor dilatih bersama critic", flush=True)
+         return True
+ 
+diff -ruN a/shared/training/trainer.py b/shared/training/trainer.py
+--- a/shared/training/trainer.py	2026-10-11 02:48:23.996709638 +0700
++++ b/shared/training/trainer.py	2026-10-11 02:48:23.998674737 +0700
+@@ -33,6 +33,7 @@
+ 
+ import numpy as np
+ import torch
++import torch as th
+ import torch.nn as nn
+ from stable_baselines3 import SAC
+ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
+@@ -51,23 +52,171 @@
+ 
+ 
+ class ArmSAC(SAC):
+-    """SAC Stable-Baselines3 + SATU penyesuaian untuk fine-tuning hasil transfer.
++    """SAC Stable-Baselines3 + penyesuaian untuk curriculum dengan transfer bobot.
+ 
+-    SB3 memakai aksi acak seragam selama `learning_starts` langkah pertama. Setelah transfer bobot
+-    (Misi N -> N+1) itu membuang policy yang sudah bagus dan mengisi replay buffer dengan data yang tidak
+-    representatif. Bila `act_with_policy_from_start` = True, aksi dikumpulkan dengan policy yang dimuat
+-    (stokastik, sesuai std aksinya) sejak langkah pertama; `learning_starts` tetap menentukan kapan
+-    gradient pertama dihitung (buffer sudah terisi data yang masuk akal).
+-    Tidak mengubah apa pun yang disimpan di checkpoint: `SAC.load()` biasa tetap bisa memuatnya.
++    1. `act_with_policy_from_start`: SB3 memakai aksi acak seragam selama `learning_starts`. Setelah transfer
++       bobot itu membuang policy yang sudah bagus. Bila True, aksi dikumpulkan dengan policy yang dimuat sejak
++       langkah pertama; `learning_starts` tetap menentukan kapan gradient pertama dihitung.
++
++    `train()` di bawah adalah salinan `SAC.train()` SB3 2.9 dengan tambahan berikut (semua bisa dimatikan;
++    nilai default = perilaku SB3 asli):
++
++    2. `actor_frozen` (dipakai CriticWarmupCallback): actor DAN koefisien entropi tidak diperbarui; hanya
++       critic yang dilatih. Sebelumnya koefisien entropi otomatis tetap diperbarui selama actor beku. Bila
++       entropi policy hasil transfer berada di bawah `target_entropy` (Misi 3: log_pi ~10.5 vs target -6),
++       actor yang beku tidak bisa menaikkan entropinya, sehingga alpha tumbuh eksponensial (terukur: 0.033 ->
++       6.8 dalam 50k langkah) dan critic dilatih dengan target -alpha*log_pi raksasa (critic_loss 3 -> 33.600).
++       Critic rusak itu diserahkan ke actor saat warm-up selesai -> success 63% -> 0% dalam 10k langkah.
++       (Arah sebaliknya di Misi 2: alpha menyusut 20x selama warm-up lalu di-reset naik 22x sekaligus.)
++    3. `ent_coef_max`: batas atas koefisien entropi otomatis (pengaman terhadap runaway yang sama setelah
++       warm-up; pada Misi 3 alpha naik lagi ke ~0.9 setelah warm-up karena target -6 tetap tak tercapai).
++    4. `actor_mean_reg`: regularisasi kecil mean pra-tanh actor, coef * mean(mu^2) (ada di implementasi SAC
++       asli Haarnoja dengan 1e-3; SB3 tidak memilikinya). Pengaman ringan agar mean actor tidak melayang ke
++       daerah tanh jenuh, tempat gradient Q tidak sampai ke actor. BUKAN penyebab keruntuhan Misi 3
++       (|mu| terukur ~1.3 setelah transfer).
++    5. Jangkar actor (`set_anchor`): setelah transfer, actor_loss += w_t * mean|Q| * mean((a - a_prior)^2),
++       a_prior = aksi deterministik actor hasil transfer (salinan beku). w_t meluruh linear dari
++       `actor_anchor_coef` ke `actor_anchor_floor` selama `actor_anchor_steps` langkah setelah warm-up.
++       Skala mean|Q| mengikuti TD3+BC (coef 0.4 = kekuatan bawaan TD3+BC). Mencegah actor mengejar galat
++       critic (overestimation). Terukur pada Misi 3 dgn jangkar meluruh ke 0: Q(s,pi) naik 26 -> 71 sementara
++       success eval turun 90% -> 10% tepat saat jangkar habis; karena itu ada `actor_anchor_floor` > 0.
++       `train/q_pi_mean` di TensorBoard memantau gejala ini.
++    Checkpoint tetap bisa dimuat dengan `SAC.load()` biasa (salinan actor jangkar tidak disimpan).
+     """
+ 
+     act_with_policy_from_start: bool = False
++    actor_frozen: bool = False
++    ent_coef_max: float | None = None
++    actor_mean_reg: float = 0.0
++    actor_anchor_coef: float = 0.0
++    actor_anchor_steps: int = 0
++    actor_anchor_floor: float = 0.0
++
++    def _excluded_save_params(self) -> list[str]:
++        return super()._excluded_save_params() + ["_anchor_actor"]
+ 
+     def _sample_action(self, learning_starts, action_noise=None, n_envs=1):
+         if self.act_with_policy_from_start:
+             learning_starts = 0
+         return super()._sample_action(learning_starts, action_noise, n_envs)
+ 
++    # ---- jangkar actor (dipanggil setelah transfer) ----
++    def set_anchor(self, coef: float, steps: int, floor: float = 0.0):
++        import copy
++        self.actor_anchor_coef, self.actor_anchor_steps = float(coef), int(steps)
++        self.actor_anchor_floor = min(float(floor), float(coef))
++        self._anchor_actor = copy.deepcopy(self.actor).eval() if self.actor_anchor_coef > 0 else None
++        if self._anchor_actor is not None:
++            for prm in self._anchor_actor.parameters():
++                prm.requires_grad_(False)
++        self._anchor_start = None            # diisi saat actor pertama kali dilatih
++
++    def anchor_weight(self) -> float:
++        if getattr(self, "_anchor_actor", None) is None or self.actor_anchor_steps <= 0 or self.actor_frozen:
++            return 0.0
++        if self._anchor_start is None:
++            self._anchor_start = self.num_timesteps
++        frac = (self.num_timesteps - self._anchor_start) / self.actor_anchor_steps
++        return max(self.actor_anchor_floor, self.actor_anchor_coef * max(0.0, 1.0 - frac))
++
++    def train(self, gradient_steps: int, batch_size: int = 64) -> None:
++        import torch.nn.functional as F
++        from stable_baselines3.common.utils import polyak_update
++
++        self.policy.set_training_mode(True)
++        optimizers = [self.actor.optimizer, self.critic.optimizer]
++        if self.ent_coef_optimizer is not None:
++            optimizers += [self.ent_coef_optimizer]
++        self._update_learning_rate(optimizers)
++
++        ent_coef_losses, ent_coefs = [], []
++        actor_losses, critic_losses, mu_abs, anchor_losses, q_pi = [], [], [], [], []
++        update_actor = not self.actor_frozen
++        w_anchor = self.anchor_weight()
++        log_ent_max = None if self.ent_coef_max is None else float(np.log(self.ent_coef_max))
++
++        for gradient_step in range(gradient_steps):
++            replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
++            discounts = replay_data.discounts if replay_data.discounts is not None else self.gamma
++            if self.use_sde:
++                self.actor.reset_noise()
++
++            mean_actions, log_std, kw = self.actor.get_action_dist_params(replay_data.observations)
++            actions_pi, log_prob = self.actor.action_dist.log_prob_from_params(mean_actions, log_std, **kw)
++            log_prob = log_prob.reshape(-1, 1)
++            mu_abs.append(float(mean_actions.detach().abs().mean()))
++
++            ent_coef_loss = None
++            if self.ent_coef_optimizer is not None and self.log_ent_coef is not None:
++                ent_coef = th.exp(self.log_ent_coef.detach())
++                assert isinstance(self.target_entropy, float)
++                ent_coef_loss = -(self.log_ent_coef * (log_prob + self.target_entropy).detach()).mean()
++                ent_coef_losses.append(ent_coef_loss.item())
++            else:
++                ent_coef = self.ent_coef_tensor
++            ent_coefs.append(ent_coef.item())
++
++            # alpha TIDAK diperbarui selama actor beku (lihat docstring butir 2)
++            if update_actor and ent_coef_loss is not None and self.ent_coef_optimizer is not None:
++                self.ent_coef_optimizer.zero_grad()
++                ent_coef_loss.backward()
++                self.ent_coef_optimizer.step()
++                if log_ent_max is not None:
++                    with th.no_grad():
++                        self.log_ent_coef.clamp_(max=log_ent_max)
++
++            with th.no_grad():
++                next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
++                next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
++                next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
++                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
++                target_q_values = replay_data.rewards + (1 - replay_data.dones) * discounts * next_q_values
++
++            current_q_values = self.critic(replay_data.observations, replay_data.actions)
++            critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
++            critic_losses.append(critic_loss.item())
++            self.critic.optimizer.zero_grad()
++            critic_loss.backward()
++            self.critic.optimizer.step()
++
++            if update_actor:
++                q_values_pi = th.cat(self.critic(replay_data.observations, actions_pi), dim=1)
++                min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
++                q_pi.append(float(min_qf_pi.detach().mean()))
++                actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
++                if self.actor_mean_reg > 0:
++                    actor_loss = actor_loss + self.actor_mean_reg * (mean_actions ** 2).mean()
++                if w_anchor > 0:
++                    with th.no_grad():
++                        a_prior = self._anchor_actor(replay_data.observations, deterministic=True)
++                        q_scale = min_qf_pi.abs().mean()
++                    anchor = ((th.tanh(mean_actions) - a_prior) ** 2).mean()
++                    anchor_losses.append(anchor.item())
++                    actor_loss = actor_loss + w_anchor * q_scale * anchor
++                actor_losses.append(actor_loss.item())
++                self.actor.optimizer.zero_grad()
++                actor_loss.backward()
++                self.actor.optimizer.step()
++
++            if gradient_step % self.target_update_interval == 0:
++                polyak_update(self.critic.parameters(), self.critic_target.parameters(), self.tau)
++                polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
++
++        self._n_updates += gradient_steps
++        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
++        self.logger.record("train/ent_coef", np.mean(ent_coefs))
++        if actor_losses:
++            self.logger.record("train/actor_loss", np.mean(actor_losses))
++            # Q(s, pi(s)) rata-rata: naik terus sementara success turun = overestimation yang dieksploitasi actor
++            self.logger.record("train/q_pi_mean", np.mean(q_pi))
++        self.logger.record("train/critic_loss", np.mean(critic_losses))
++        self.logger.record("train/actor_mu_abs", np.mean(mu_abs))      # > ~3 = aksi jenuh
++        self.logger.record("train/anchor_weight", w_anchor)
++        if anchor_losses:
++            self.logger.record("train/anchor_mse", np.mean(anchor_losses))
++        if len(ent_coef_losses) > 0:
++            self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
++
+ 
+ @dataclass
+ class TrainContext:
+@@ -149,6 +298,8 @@
+         policy_kwargs=policy_kwargs, tensorboard_log=str(logdir), seed=seed, device=device,
+         verbose=1)
+     model.act_with_policy_from_start = bool(act_with_policy_from_start)
++    model.ent_coef_max = None if p.get("ent_coef_max") is None else float(p["ent_coef_max"])
++    model.actor_mean_reg = float(p.get("actor_mean_reg", 0.0))
+     return model
+ 
+ 
+@@ -251,6 +402,11 @@
+     ctx.model = model
+     if tcfg.get("enabled", False):
+         transfer_from_previous(model, train_env, tcfg, root, mission_id, log=log)
++        model.set_anchor(float(tcfg.get("actor_anchor_coef", 0.0)), int(tcfg.get("actor_anchor_steps", 0)),
++                         float(tcfg.get("actor_anchor_floor", 0.0)))
++        if model.actor_anchor_coef > 0:
++            log(f"[transfer] jangkar actor aktif: coef {model.actor_anchor_coef} meluruh ke "
++                f"{model.actor_anchor_floor} dalam {model.actor_anchor_steps:,} langkah setelah warm-up")
+         # eval env memakai stats train (disinkron oleh callback), tetapi inisialisasi juga:
+         eval_env.obs_rms = train_env.obs_rms
+         # Bekukan statistik normalisasi. Bila terus diperbarui, mean/var dimensi lama bergeser ke

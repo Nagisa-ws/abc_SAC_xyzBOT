@@ -1,0 +1,19 @@
+{
+  "success_rate": 0.58,
+  "mean_return": 8.441606484828954,
+  "mean_steps": 158.06,
+  "mean_final_dist": 0.0455213666443792,
+  "reasons": {
+    "success": 29,
+    "leaf_overbend": 11,
+    "grip_slip": 2,
+    "twist_fail": 3,
+    "timeout": 2,
+    "grasp_miss": 2,
+    "fruit_hit": 1
+  },
+  "cross_track_mean": 0.013348012502112391,
+  "min_clearance": -0.022180467988192024,
+  "level": 2,
+  "timesteps": 75000
+}

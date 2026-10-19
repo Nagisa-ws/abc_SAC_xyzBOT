@@ -1,0 +1,15 @@
+{
+  "success_rate": 0.86,
+  "mean_return": 22.49698324975514,
+  "mean_steps": 107.92,
+  "mean_final_dist": 0.03239423244157811,
+  "reasons": {
+    "success": 43,
+    "leaf_overbend": 5,
+    "timeout": 2
+  },
+  "cross_track_mean": 0.011492292882416466,
+  "min_clearance": -0.018698953907813818,
+  "level": 3,
+  "timesteps": 600000
+}

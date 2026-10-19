@@ -1,0 +1,109 @@
+# Mission3/configs/sac_config.yaml  (v3)
+# Konfigurasi TRAINING Misi 3 (SAC, normalisasi, transfer, ekspor, debug).
+# Jalankan: python train_mission3.py   (tanpa argumen CLI)
+#
+# v3: struktur policy RESIDUAL (Mission3/configs/domain_randomization.yaml -> policy_structure).
+# Level TERAKHIR kurikulum = tugas yang dipakai semua evaluasi (shared/evaluation/task_spec.py). Bila level
+# terakhir dihapus/diubah, evaluasi ikut berubah otomatis (tidak ada lagi eval yang lebih sulit dari training).
+
+runtime:
+  torch_num_threads: 1
+  device: cpu                    # MLP kecil: CPU umumnya lebih cepat dari GPU
+  progress_print_interval_sec: 15
+
+run:
+  timesteps: 1_000_000            # terverifikasi: 300k -> uji held-out 100 % (100 % sejak 60k)
+  n_envs: 4
+  vec_env: auto                  # auto | subproc | dummy
+  seed: 6
+  logdir: checkpoints/mission3/tb_logs
+  ckpt_dir: checkpoints/mission3
+  ckpt_freq: 500_000             # checkpoint periodik (model + VecNormalize; replay buffer TIDAK disimpan)
+  eval_freq: 25_000              # evaluasi deterministik -> best_model (lebih jarang = bias seleksi lebih kecil)
+  eval_episodes: 50              # skenario evaluasi TETAP tiap putaran (eval_seed) -> perbandingan adil
+  eval_seed: 424242
+  log_interval_episodes: 10      # SAC menulis log TensorBoard tiap N episode
+  final_validation_episodes: 100 # akhir training: pilih best/final pada skenario validasi
+  final_test_episodes: 200       # lalu uji pada skenario baru -> checkpoints/mission3/final_test.json
+
+sac:
+  buffer_size: 250_000           # PER ENV: 4 env x 250k = 1 juta transisi (~0,5 GB RAM)
+  learning_starts: 5_000         # data dikumpulkan dgn policy hasil transfer
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.995
+  train_freq: 1
+  gradient_steps: 1              # update-to-data 0.25 (4 env): tanpa overestimation, ~3x lebih cepat
+  learning_rate: 1.5e-4
+  lr_schedule: constant          # constant | linear
+  ent_coef: 0.005                # alpha TETAP (alpha otomatis lepas kendali di Misi 3, lihat FIX_NOTES/README)
+  target_entropy: auto           # hanya dipakai bila ent_coef = auto_*
+  ent_coef_max: 0.02             # batas atas alpha otomatis (diabaikan bila ent_coef tetap)
+  actor_mean_reg: 1.0e-3         # regularisasi kecil mean pra-tanh
+  net_arch: [256, 256]           # actor; sama di SEMUA misi (syarat transfer bobot)
+  qf_net_arch: [256, 256]        # critic Q; sama di SEMUA misi
+  activation_fn: relu            # relu | tanh | elu
+
+normalization:
+  clip_obs: 10.0
+  epsilon: 1.0e-8
+  norm_reward: false
+
+transfer:                        # muat bobot Misi 2 (observasi terpadu -> dimensi sama)
+  enabled: true
+  source_mission: 2
+  source_model: checkpoints/mission2/best_model.zip
+  source_vecnormalize: checkpoints/mission2/best_vecnormalize.pkl
+  zero_new_input_weights: true   # bobot input untuk fitur yang baru aktif di-nol-kan (actor + kedua critic Q)
+  # --- perlindungan fine-tuning ---
+  freeze_obs_rms: true           # statistik normalisasi TIDAK diperbarui (jika diperbarui, input actor bergeser)
+  warm_stats_steps: 8000         # statistik dimensi baru diisi dari rollout nyata misi ini
+  obs_rms_count: 50000.0
+  critic_warmup_steps: 25000     # actor DAN alpha dibekukan, hanya critic Q yang dilatih
+  log_std_init: null             # (struktur direct) ganti std aksi; residual memakai residual_log_std_init
+  copy_ent_coef: false           # alpha dari sac.ent_coef
+  # Residual: fitur & critic dari Misi 2 dipakai, tetapi KOREKSI direset ke ~0 dan jangkar menarik ke koreksi
+  # NOL (= jalur tervalidasi yang bebas rintangan). Terukur: koreksi warisan Misi 2 + jangkar ke Misi 2 ->
+  # tabrakan 10-16% pada margin 1 cm (level akhir), padahal controller referensi saja ~100%.
+  reset_residual_output: true
+  residual_log_std_init: -1.6
+  actor_anchor_target: zero      # zero = koreksi nol | prior = policy misi sebelumnya
+  actor_anchor_coef: 0.4
+  actor_anchor_steps: 150000
+  actor_anchor_floor: 0.2
+
+# ─── Kurikulum kesulitan (Misi 3) ───
+#   obstacle_margin : koridor aman di sekitar garis T1->T2 (rintangan lebih dekat dari ini dipangkas).
+#   approach_margin : koridor aman di sekitar jalur home->T1.
+#   reach_r_max/z_max: batas radius & tinggi T1.
+# Naik 1 level bila success rate di level aktif >= advance_success_rate. Level TERAKHIR = tugas penuh
+# (= tugas evaluasi). Dengan struktur residual, controller referensi sudah mengikuti jalur aman, jadi
+# kurikulum biasanya naik cepat.
+curriculum:
+  enabled: true
+  advance_success_rate: 0.80
+  check_every_n_episodes: 50
+  window_episodes: 100
+  warmup_episodes: 100
+  levels:
+    - {obstacle_margin: 0.12, approach_margin: 0.20, reach_r_max: 0.52, reach_z_max: 0.72}
+    - {obstacle_margin: 0.08, approach_margin: 0.20, reach_r_max: 0.60, reach_z_max: 0.80}
+    - {obstacle_margin: 0.05, approach_margin: 0.20, reach_r_max: 0.70, reach_z_max: 0.88}
+    - {obstacle_margin: 0.03, approach_margin: 0.15}
+    - {obstacle_margin: 0.01, approach_margin: 0.15}
+
+export:
+  onnx_dir: models               # folder bersama semua misi
+  name_prefix: onnx_mission3     # -> models/onnx_mission3_v1.onnx, _v2, ...
+  source: auto                   # auto (pilih best/final lewat set validasi) | best | final
+  verify_tolerance: 1.0e-4
+
+debug:
+  enabled: true
+  output_dir: checkpoints/mission3/debug
+  run_sanity_check_before_training: true
+  sanity_n_ik_targets: 20
+  sanity_n_resets: 10
+  sanity_n_scripted_episodes: 10
+  replay_episodes: 3
+  robustness_episodes: 20

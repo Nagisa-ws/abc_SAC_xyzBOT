@@ -1,0 +1,10 @@
+{
+  "mission": 2,
+  "algorithm": "SAC",
+  "obs_dim": 57,
+  "source_model": "C:\\Users\\APL\\Documents\\ABC_XYZbot_SAC\\checkpoints\\mission2\\best_model.zip",
+  "vecnormalize": "C:\\Users\\APL\\Documents\\ABC_XYZbot_SAC\\checkpoints\\mission2\\best_vecnormalize.pkl",
+  "source": "best",
+  "timesteps": 1500000,
+  "interrupted": false
+}

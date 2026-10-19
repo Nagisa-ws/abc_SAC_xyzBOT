@@ -1,0 +1,54 @@
+{
+  "level": 4,
+  "levels": [
+    {
+      "obstacle_margin": 0.12,
+      "approach_margin": 0.2,
+      "reach_r_max": 0.52,
+      "reach_z_max": 0.72
+    },
+    {
+      "obstacle_margin": 0.08,
+      "approach_margin": 0.2,
+      "reach_r_max": 0.6,
+      "reach_z_max": 0.8
+    },
+    {
+      "obstacle_margin": 0.05,
+      "approach_margin": 0.2,
+      "reach_r_max": 0.7,
+      "reach_z_max": 0.88
+    },
+    {
+      "obstacle_margin": 0.03,
+      "approach_margin": 0.15
+    },
+    {
+      "obstacle_margin": 0.01,
+      "approach_margin": 0.15
+    }
+  ],
+  "timesteps": 52296,
+  "history": [
+    {
+      "level": 0,
+      "success_rate": 1.0,
+      "timesteps": 12548
+    },
+    {
+      "level": 1,
+      "success_rate": 1.0,
+      "timesteps": 25856
+    },
+    {
+      "level": 2,
+      "success_rate": 1.0,
+      "timesteps": 39048
+    },
+    {
+      "level": 3,
+      "success_rate": 1.0,
+      "timesteps": 52296
+    }
+  ]
+}

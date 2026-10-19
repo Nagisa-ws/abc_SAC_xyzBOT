@@ -1,0 +1,55 @@
+{
+  "level": 3,
+  "levels": [
+    {
+      "p_block": 0.0,
+      "max_per_side": 1,
+      "p_all_sides": 0.0,
+      "rosette_min": 6,
+      "rosette_max": 10,
+      "stiffness_max": 4.0
+    },
+    {
+      "p_block": 0.3,
+      "max_per_side": 1,
+      "p_all_sides": 0.05,
+      "rosette_min": 8,
+      "rosette_max": 12,
+      "stiffness_max": 6.0
+    },
+    {
+      "p_block": 0.5,
+      "max_per_side": 2,
+      "p_all_sides": 0.15,
+      "rosette_min": 10,
+      "rosette_max": 14,
+      "stiffness_max": 8.0
+    },
+    {
+      "p_block": 0.6,
+      "max_per_side": 2,
+      "p_all_sides": 0.25,
+      "rosette_min": 10,
+      "rosette_max": 14,
+      "stiffness_max": 10.0
+    }
+  ],
+  "timesteps": 30704,
+  "history": [
+    {
+      "level": 0,
+      "success_rate": 0.97,
+      "timesteps": 10020
+    },
+    {
+      "level": 1,
+      "success_rate": 0.97,
+      "timesteps": 20116
+    },
+    {
+      "level": 2,
+      "success_rate": 0.88,
+      "timesteps": 30704
+    }
+  ]
+}

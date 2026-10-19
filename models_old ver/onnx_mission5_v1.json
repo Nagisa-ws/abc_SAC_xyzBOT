@@ -1,0 +1,29 @@
+{
+  "mission": 5,
+  "algorithm": "SAC",
+  "obs_dim": 63,
+  "source_model": "/home/claude/ABC_XYZbot_SAC/checkpoints/mission5/best_model.zip",
+  "vecnormalize": "/home/claude/ABC_XYZbot_SAC/checkpoints/mission5/best_vecnormalize.pkl",
+  "source": "best",
+  "timesteps": 300000,
+  "interrupted": false,
+  "heldout_test": {
+    "n": 200,
+    "seed0": 400000,
+    "success_rate": 0.595,
+    "ci95": [
+      0.5257958199999483,
+      0.6606234388755706
+    ],
+    "reasons": {
+      "success": 119,
+      "fruit_hit": 8,
+      "leaf_overbend": 35,
+      "timeout": 9,
+      "twist_fail": 10,
+      "grasp_miss": 8,
+      "grip_slip": 5,
+      "plant_hit": 6
+    }
+  }
+}

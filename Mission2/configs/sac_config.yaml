@@ -1,0 +1,82 @@
+# Mission2/configs/sac_config.yaml  (v3)
+# Konfigurasi TRAINING Misi 2 (SAC, normalisasi, transfer, ekspor, debug).
+# Jalankan: python train_mission2.py   (tanpa argumen CLI)
+#
+# v3: struktur policy RESIDUAL (Mission2/configs/domain_randomization.yaml -> policy_structure).
+
+runtime:
+  torch_num_threads: 1
+  device: cpu                    # MLP kecil: CPU umumnya lebih cepat dari GPU
+  progress_print_interval_sec: 15
+
+run:
+  timesteps: 1_000_000            # terverifikasi: 150k -> uji held-out 99,5 %
+  n_envs: 4
+  vec_env: auto                  # auto | subproc | dummy
+  seed: 5
+  logdir: checkpoints/mission2/tb_logs
+  ckpt_dir: checkpoints/mission2
+  ckpt_freq: 500_000             # checkpoint periodik (model + VecNormalize; replay buffer TIDAK disimpan)
+  eval_freq: 25_000              # evaluasi deterministik -> best_model (lebih jarang = bias seleksi lebih kecil)
+  eval_episodes: 50              # skenario evaluasi TETAP tiap putaran (eval_seed) -> perbandingan adil
+  eval_seed: 424242
+  log_interval_episodes: 10      # SAC menulis log TensorBoard tiap N episode
+  final_validation_episodes: 100 # akhir training: pilih best/final pada skenario validasi
+  final_test_episodes: 200       # lalu uji pada skenario baru -> checkpoints/mission2/final_test.json
+
+sac:
+  buffer_size: 250_000           # PER ENV: 4 env x 250k = 1 juta transisi (~0,5 GB RAM)
+  learning_starts: 5_000         # data dikumpulkan dgn policy hasil transfer
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.995
+  train_freq: 1
+  gradient_steps: 1              # update-to-data 0.25 (4 env): stabil dan ~3x lebih cepat
+  learning_rate: 1.0e-4          # fine-tuning dari misi sebelumnya: kecil
+  lr_schedule: constant          # constant | linear
+  ent_coef: auto_0.01            # alpha awal kecil
+  target_entropy: -8             # lebih rendah dari default (-6): koreksi lebih deterministik
+  ent_coef_max: 0.02             # batas atas alpha otomatis (pengaman runaway)
+  actor_mean_reg: 1.0e-3         # regularisasi kecil mean pra-tanh
+  net_arch: [256, 256]           # actor; sama di SEMUA misi (syarat transfer bobot)
+  qf_net_arch: [256, 256]        # critic Q; sama di SEMUA misi
+  activation_fn: relu            # relu | tanh | elu
+
+normalization:
+  clip_obs: 10.0
+  epsilon: 1.0e-8
+  norm_reward: false
+
+transfer:                        # muat bobot Misi 1 (observasi terpadu -> dimensi sama)
+  enabled: true
+  source_mission: 1
+  source_model: checkpoints/mission1/best_model.zip
+  source_vecnormalize: checkpoints/mission1/best_vecnormalize.pkl
+  zero_new_input_weights: true   # bobot input untuk fitur yang baru aktif di-nol-kan (actor + kedua critic Q)
+  # --- perlindungan fine-tuning ---
+  freeze_obs_rms: true           # statistik normalisasi TIDAK diperbarui (jika diperbarui, input actor bergeser)
+  warm_stats_steps: 8000         # statistik dimensi baru diisi dari rollout nyata misi ini
+  obs_rms_count: 50000.0
+  critic_warmup_steps: 25000     # actor DAN alpha dibekukan, hanya critic Q yang dilatih
+  log_std_init: null             # pertahankan std koreksi dari misi sebelumnya
+  copy_ent_coef: false           # alpha dimulai dari sac.ent_coef
+  # jangkar actor ke policy Misi 1 (meluruh dari coef ke floor); mencegah actor mengejar galat critic
+  actor_anchor_coef: 0.4
+  actor_anchor_steps: 150000
+  actor_anchor_floor: 0.2
+
+export:
+  onnx_dir: models               # folder bersama semua misi
+  name_prefix: onnx_mission2     # -> models/onnx_mission2_v1.onnx, _v2, ...
+  source: auto                   # auto (pilih best/final lewat set validasi) | best | final
+  verify_tolerance: 1.0e-4
+
+debug:
+  enabled: true
+  output_dir: checkpoints/mission2/debug
+  run_sanity_check_before_training: true
+  sanity_n_ik_targets: 20
+  sanity_n_resets: 10
+  sanity_n_scripted_episodes: 10
+  replay_episodes: 3
+  robustness_episodes: 20
