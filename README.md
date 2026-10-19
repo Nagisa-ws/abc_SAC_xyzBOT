@@ -198,7 +198,7 @@ frozen, because updating them would shift the inputs of the transferred policy.
 
 ### 4.2 Inverse kinematics (damped least squares)
 
-For the target pose ```math $(p^{*}, q^{*})$ ```the solver iterates from the current joint state:
+For the target pose $`(p^{\ast}, q^{\ast})`$ the solver iterates from the current joint state:
 
 ```math
 e = \begin{bmatrix} p^{\ast} - p(q) \\ w_r\,\mathrm{Log}(q^{\ast} \otimes q(q)^{-1}) \end{bmatrix},\qquad
