@@ -200,8 +200,10 @@ frozen, because updating them would shift the inputs of the transferred policy.
 
 For the target pose $(p^{*}, q^{*})$ the solver iterates from the current joint state:
 
-$$e = \begin{bmatrix} p^{*} - p(q) \\ w_r\,\mathrm{Log}(q^{*} \otimes q(q)^{-1}) \end{bmatrix},\qquad
-\Delta q = J_w^\top \left(J_w J_w^\top + \lambda^2 I\right)^{-1} e_w,$$
+```math
+e = \begin{bmatrix} p^{\ast} - p(q) \\ w_r\,\mathrm{Log}(q^{\ast} \otimes q(q)^{-1}) \end{bmatrix},\qquad
+\Delta q = J_w^\top \left(J_w J_w^\top + \lambda^2 I\right)^{-1} e_w,
+```
 
 with rotation weight $w_r = 0.5$, a step limit of 0.3 rad, up to 60 iterations, and tolerances of 0.1 mm and 0.002 rad.
 The damping grows near singularities:
